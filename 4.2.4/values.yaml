@@ -1,0 +1,110 @@
+# -----------------------------------------------------------------------------
+# Open OnDemand portal image
+# -----------------------------------------------------------------------------
+# IMPORTANT: The Open OnDemand project does NOT publish a production container
+# image. Build one from the upstream Dockerfile.example
+# (https://github.com/OSC/ondemand/blob/master/Dockerfile.example) and push it to
+# your PCAI registry (Harbor). The image runs OnDemand's systemd stack
+# (CMD ["/sbin/init"]) with Apache httpd + the Per-User NGINX (PUN) dashboard.
+image:
+  repository: docker.io/ohiosupercomputer/ondemand
+  # Image tag. Defaults to the chart appVersion when left empty.
+  tag: "4.2.4"
+  pullPolicy: IfNotPresent
+
+# Pull secret(s) for the private PCAI registry (Harbor).
+imagePullSecrets: []
+# - name: registry-credentials
+
+# -----------------------------------------------------------------------------
+# PCAI (HPE EzUA) networking
+# -----------------------------------------------------------------------------
+ezua:
+  domainName: "${DOMAIN_NAME}"
+  virtualService:
+    endpoint: "ondemand.${DOMAIN_NAME}"
+    istioGateway: "istio-system/ezaf-gateway"
+
+service:
+  httpPort: 80
+  httpsPort: 443
+
+# Public FQDN the portal is served on. Must equal the VirtualService host with
+# ${DOMAIN_NAME} resolved (e.g. ondemand.pcai.example.com). Apache and OIDC
+# redirects need this when the portal sits behind the Istio gateway. Leave empty
+# to skip the ood_portal.yml override and use the image's built-in default.
+portal:
+  servername: ""
+
+# -----------------------------------------------------------------------------
+# Portal resources
+# -----------------------------------------------------------------------------
+# The portal itself is CPU-only. GPUs are requested by the per-user SESSION pods
+# (interactive apps) through their submit.yml.erb `native.container`, NOT here.
+# See README.md -> "Session-per-pod and GPUs".
+resources:
+  requests:
+    cpu: 1
+    memory: 2Gi
+  limits:
+    cpu: 4
+    memory: 8Gi
+
+storage:
+  size: 20Gi
+  class: gl4f-filesystem
+
+# -----------------------------------------------------------------------------
+# Security context
+# -----------------------------------------------------------------------------
+# OnDemand's httpd + PUN + systemd must start as root, and systemd needs a
+# privileged container. PCAI enforces a restricted Pod Security Standard by
+# default, so a platform admin must permit this workload to run privileged / as
+# root (a SecurityContextConstraint / Kyverno exception). See README.md.
+podSecurityContext:
+  fsGroup: 0
+securityContext:
+  runAsUser: 0
+  runAsNonRoot: false
+  privileged: true
+
+# Extra environment variables for the portal container.
+extraEnv: []
+# - name: OOD_SHOW_ALL_APPS
+#   value: "true"
+
+# -----------------------------------------------------------------------------
+# Kubernetes adapter: lets the dashboard launch interactive apps as pods
+# -----------------------------------------------------------------------------
+# Rendered into /etc/ood/config/clusters.d/pcai.yml. This is what turns "launch
+# an interactive app" into "create a Kubernetes pod" (session per pod).
+clusterConfig:
+  enabled: true
+  title: "PCAI Kubernetes"
+  # Namespace prefix for per-user namespaces. Empty => session pods are created in
+  # the release namespace (single-namespace mode, works with the namespaced RBAC
+  # below). A non-empty prefix needs cluster-scoped RBAC + login hooks (admin).
+  namespacePrefix: ""
+  # No login / SSH nodes exist in a pure-Kubernetes setup.
+  sshAllow: false
+
+# -----------------------------------------------------------------------------
+# RBAC for session-per-pod
+# -----------------------------------------------------------------------------
+rbac:
+  # ServiceAccount + namespaced Role/RoleBinding so OnDemand can create session
+  # pods (and their services/configmaps/secrets) IN ITS OWN NAMESPACE. This is the
+  # self-contained "one pod per session" mode a PCAI import can enable by itself.
+  create: true
+  serviceAccountName: ondemand
+  # Cluster-scoped ClusterRoles for TRUE multi-user, namespace-per-user isolation
+  # (create user namespaces, roles, rolebindings). Requires CLUSTER-ADMIN and is
+  # normally applied out-of-band by a PCAI platform admin. Off by default.
+  clusterScoped: false
+
+# -----------------------------------------------------------------------------
+# Scheduling
+# -----------------------------------------------------------------------------
+nodeSelector: {}
+tolerations: []
+affinity: {}

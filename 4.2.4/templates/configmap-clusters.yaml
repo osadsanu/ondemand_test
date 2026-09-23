@@ -1,0 +1,31 @@
+{{- if .Values.clusterConfig.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-clusters
+data:
+  # Dropped into /etc/ood/config/clusters.d so the dashboard's job adapter turns
+  # "launch an interactive app" into "create a Kubernetes pod" (session per pod).
+  pcai.yml: |
+    ---
+    v2:
+      metadata:
+        title: {{ .Values.clusterConfig.title | quote }}
+      job:
+        adapter: "kubernetes"
+        cluster: "pcai"
+        bin: "/usr/bin/kubectl"
+        namespace_prefix: {{ .Values.clusterConfig.namespacePrefix | quote }}
+        all_namespaces: false
+        auto_supplemental_groups: false
+        # In-cluster API: the portal pod authenticates with its mounted
+        # ServiceAccount token (see rbac.yaml).
+        server:
+          endpoint: "https://kubernetes.default.svc"
+          cert_authority_file: "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+        auth:
+          type: "managed"
+      batch_connect:
+        # No login/SSH worker nodes in a pure-Kubernetes setup.
+        ssh_allow: {{ .Values.clusterConfig.sshAllow }}
+{{- end }}

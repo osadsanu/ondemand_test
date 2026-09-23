@@ -1,0 +1,6 @@
+apiVersion: v2
+version: 0.0.1
+appVersion: v4.2.4
+type: application
+name: ondemand
+description: Open OnDemand HPC web portal (interactive apps as per-user Kubernetes pods)

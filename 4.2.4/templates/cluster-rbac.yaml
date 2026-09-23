@@ -1,0 +1,48 @@
+{{- if .Values.rbac.clusterScoped }}
+# -----------------------------------------------------------------------------
+# CLUSTER-SCOPED bootstrap for TRUE multi-user, namespace-per-user isolation.
+# Mirrors the upstream OnDemand bootstrap:
+#   https://github.com/OSC/ondemand/blob/master/hooks/k8s-bootstrap/ondemand.yaml
+# Requires CLUSTER-ADMIN to install. Leave rbac.clusterScoped=false for a normal
+# namespaced PCAI import; a platform admin enables this deliberately.
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Chart.Name }}-bootstrap
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces", "serviceaccounts"]
+    verbs: ["get", "create", "update", "patch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "create", "update", "patch"]
+  # Only needed for the `kubectl cluster-info` subcommand.
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["list"]
+---
+# Bound per-user (as a RoleBinding, by the login hooks) so each user can only
+# manage workloads in their own namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Chart.Name }}-user
+rules:
+  - apiGroups: [""]
+    resources: ["services", "pods", "configmaps", "secrets", "pods/log"]
+    verbs: ["get", "watch", "list", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Chart.Name }}-bootstrap
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Chart.Name }}-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.rbac.serviceAccountName }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

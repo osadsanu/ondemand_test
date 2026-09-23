@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+        hpe-ezua/app: {{ .Chart.Name }}
+        hpe-ezua/component: {{ .Chart.Name }}
+        hpe-ezua/type: vendor-service
+    spec:
+      restartPolicy: Always
+      serviceAccountName: {{ .Values.rbac.serviceAccountName }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.httpPort }}
+              protocol: TCP
+            - name: https
+              containerPort: {{ .Values.service.httpsPort }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            # Persisted user home directories / session state.
+            - name: data
+              mountPath: /home
+            # systemd needs a writable, in-memory /run.
+            - name: run
+              mountPath: /run
+            {{- if .Values.clusterConfig.enabled }}
+            - name: clusters
+              mountPath: /etc/ood/config/clusters.d
+              readOnly: true
+            {{- end }}
+            {{- if .Values.portal.servername }}
+            - name: portal
+              mountPath: /etc/ood/config/ood_portal.yml
+              subPath: ood_portal.yml
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Chart.Name }}-pvc
+        - name: run
+          emptyDir:
+            medium: Memory
+        {{- if .Values.clusterConfig.enabled }}
+        - name: clusters
+          configMap:
+            name: {{ .Chart.Name }}-clusters
+        {{- end }}
+        {{- if .Values.portal.servername }}
+        - name: portal
+          configMap:
+            name: {{ .Chart.Name }}-portal
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,15 @@
+{{- if .Values.portal.servername }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-portal
+data:
+  # Mounted at /etc/ood/config/ood_portal.yml. Tells Apache the public hostname
+  # the portal is served on behind the Istio gateway (needed for correct vhost
+  # and OIDC redirect URLs). Run `update_ood_portal` inside the container (or on
+  # boot) to regenerate the Apache config from this file.
+  ood_portal.yml: |
+    ---
+    servername: {{ .Values.portal.servername | quote }}
+    port: {{ .Values.service.httpPort }}
+{{- end }}
