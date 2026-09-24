@@ -7,9 +7,9 @@
 # your PCAI registry (Harbor). The image runs OnDemand's systemd stack
 # (CMD ["/sbin/init"]) with Apache httpd + the Per-User NGINX (PUN) dashboard.
 image:
-  repository: docker.io/ohiosupercomputer/ondemand
+  repository: ghcr.io/osadsanu/ondemand_test
   # Image tag. Defaults to the chart appVersion when left empty.
-  tag: "4.2.4"
+  tag: "sha-ab09ffd"
   pullPolicy: IfNotPresent
 
 # Pull secret(s) for the private PCAI registry (Harbor).
