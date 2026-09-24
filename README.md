@@ -177,7 +177,7 @@ created in the release namespace using the namespaced `Role` from `rbac.yaml`.
 | `rbac.clusterScoped` | `false` | Install cluster-scoped bootstrap (admin only). |
 | `nodeSelector` / `tolerations` / `affinity` | `{}` / `[]` / `{}` | Scheduling. |
 
----
+----
 
 ## Install / package
 
